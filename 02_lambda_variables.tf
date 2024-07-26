@@ -7,6 +7,14 @@ variable "lambda_filename" {
   description = "Path to the function's deployment package within the local filesystem. Exactly one of filename, image_uri, or s3_bucket must be specified."
   type        = string
   default     = null
+  validation {
+    condition = (
+      (var.lambda_filename != null ? 1 : 0) +
+      (var.lambda_image_uri != null ? 1 : 0) +
+      (var.lambda_s3_bucket != null ? 1 : 0)
+    ) == 1
+    error_message = "If image_uri or s3_bucket are not set, at least filename should be set"
+  }
 }
 
 variable "lambda_s3_bucket" {
@@ -16,9 +24,13 @@ variable "lambda_s3_bucket" {
 }
 
 variable "lambda_s3_key" {
-  description = "S3 key of an object containing the function's deployment package. When s3_bucket is set, s3_key is required."
+  description = "S3 key of an object containing the function's deployment package."
   type        = string
   default     = null
+  validation {
+    condition     = (var.lambda_s3_bucket != null && var.lambda_s3_key != null) || var.lambda_s3_key == null
+    error_message = "When s3_bucket is set, s3_key is required."
+  }
 }
 
 variable "lambda_s3_object_version" {
@@ -36,17 +48,15 @@ variable "lambda_image_uri" {
 variable "lambda_handler" {
   description = "Function entrypoint in your code."
   type        = string
-  default     = ""
 }
 
 variable "lambda_runtime" {
   description = "Function runtime"
   type        = string
-  default     = ""
 }
 
 variable "lambda_architectures" {
-  description = "Instruction set architecture for your Lambda function. Valid values are x86_64 and arm64. Default is x86_64. Removing this attribute, function's architecture stay the same."
+  description = "Instruction set architecture for your Lambda function. Valid values are x86_64 and arm64. Removing this attribute, function's architecture stay the same."
   type        = string
   default     = "x86_64"
 }
@@ -70,15 +80,23 @@ variable "lambda_description" {
 }
 
 variable "lambda_environment_variables" {
-  description = "Map of environment variables that are accessible from the function code during execution. If provided at least one key must be present."
+  description = "Map of environment variables that are accessible from the function code during execution."
   type        = map(string)
   default     = null
+  validation {
+    condition     = var.lambda_environment_variables == null || can(length(var.lambda_environment_variables) > 0)
+    error_message = "If provided, at least one environment variable must be present."
+  }
 }
 
 variable "lambda_ephemeral_storage_size" {
-  description = "The size of the Lambda function Ephemeral storage(/tmp) represented in MB. The minimum supported ephemeral_storage value defaults to 512MB and the maximum supported value is 10240MB."
+  description = "The size of the Lambda function Ephemeral storage(/tmp) represented in MB."
   type        = number
   default     = null
+  validation {
+    condition     = can(var.lambda_ephemeral_storage_size >= 512 && var.lambda_ephemeral_storage_size <= 10240) || var.lambda_ephemeral_storage_size == null
+    error_message = "The size must be between 512 MB and 10240 MB."
+  }
 }
 
 variable "lambda_file_system_config_arn" {
@@ -118,9 +136,13 @@ variable "lambda_kms_key_arn" {
 }
 
 variable "lambda_layers" {
-  description = "List of Lambda Layer Version ARNs (maximum of 5) to attach to your Lambda Function."
+  description = "List of Lambda Layer Version ARNs to attach to your Lambda Function."
   type        = list(string)
   default     = null
+  validation {
+    condition     = can(length(var.lambda_layers) <= 5) || var.lambda_layers == null
+    error_message = "Maximum of 5."
+  }
 }
 
 variable "lambda_application_log_level" {
@@ -130,9 +152,9 @@ variable "lambda_application_log_level" {
 }
 
 variable "lambda_log_format" {
-  description = "Select between Text and structured JSON format for your function's logs. Default JSON"
+  description = "Select between Text and structured JSON format for your function's logs."
   type        = string
-  default     = null
+  default     = "JSON"
 }
 
 variable "lambda_log_group" {
@@ -148,19 +170,19 @@ variable "lambda_system_log_level" {
 }
 
 variable "lambda_memory_size" {
-  description = "Configuration block used to specify advanced logging settings. Detailed below."
+  description = "Configuration block used to specify advanced logging settings."
   type        = number
   default     = null
 }
 
 variable "lambda_package_type" {
-  description = "Lambda deployment package type. Valid values are Zip and Image. Defaults to Zip."
+  description = "Lambda deployment package type. Valid values are Zip and Image."
   type        = string
   default     = "Zip"
 }
 
 variable "lambda_publish" {
-  description = "Whether to publish creation/change as new Lambda Function Version. Defaults to false."
+  description = "Whether to publish creation/change as new Lambda Function Version."
   type        = bool
   default     = false
 }
@@ -169,12 +191,16 @@ variable "lambda_role_arn" {
   description = "Amazon Resource Name (ARN) of the function's execution role. The role provides the function's identity and access to AWS services and resources."
   type        = string
   default     = null
+  validation {
+    condition     = (var.lambda_role_arn == null && var.iam_role_assume_role_policy != null) || var.lambda_role_arn != null
+    error_message = "If this resource is set that role will be used for the lambda, if not the variable iam_role_assume_role_policy must be set instead to generate a role for the lambda."
+  }
 }
 
 variable "lambda_reserved_concurrent_executions" {
-  description = "Amount of reserved concurrent executions for this lambda function. A value of 0 disables lambda from being triggered and -1 removes any concurrency limitations. Defaults to Unreserved Concurrency Limits -1."
+  description = "Amount of reserved concurrent executions for this lambda function. A value of 0 disables lambda from being triggered and -1 removes any concurrency limitations."
   type        = number
-  default     = null
+  default     = -1
 }
 
 variable "lambda_replace_security_groups_on_destroy" {
@@ -184,9 +210,13 @@ variable "lambda_replace_security_groups_on_destroy" {
 }
 
 variable "lambda_replacement_security_group_ids" {
-  description = "List of security group IDs to assign to the function's VPC configuration prior to destruction. replace_security_groups_on_destroy must be set to true to use this attribute."
+  description = "List of security group IDs to assign to the function's VPC configuration prior to destruction."
   type        = set(string)
   default     = null
+  validation {
+    condition     = (var.lambda_replace_security_groups_on_destroy == true && var.lambda_replacement_security_group_ids != null) || var.lambda_replacement_security_group_ids == null
+    error_message = "lambda_replace_security_groups_on_destroy must be set to true to use this attribute."
+  }
 }
 
 variable "lambda_skip_destroy" {
@@ -208,9 +238,9 @@ variable "lambda_snap_start_apply_on" {
 }
 
 variable "lambda_timeout" {
-  description = "Amount of time your Lambda Function has to run in seconds. Defaults to 3."
+  description = "Amount of time your Lambda Function has to run in seconds."
   type        = number
-  default     = null
+  default     = 3
 }
 
 variable "lambda_tags" {
@@ -220,9 +250,13 @@ variable "lambda_tags" {
 }
 
 variable "lambda_tracing_config_mode" {
-  description = "Whether to sample and trace a subset of incoming requests with AWS X-Ray. Valid values are PassThrough and Active."
+  description = "Whether to sample and trace a subset of incoming requests with AWS X-Ray."
   type        = string
   default     = null
+  validation {
+    condition     = can(regex("^PassThrough|Active$", var.lambda_tracing_config_mode)) || var.lambda_tracing_config_mode == null
+    error_message = "Valid values are PassThrough and Active."
+  }
 }
 
 variable "lambda_vpc_config_security_group_ids" {
@@ -238,7 +272,7 @@ variable "lambda_vpc_config_subnet_ids" {
 }
 
 variable "lambda_vpc_config_ipv6_allowed_for_dual_stack" {
-  description = "Allows outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets. Default is false."
+  description = "Allows outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets."
   type        = bool
   default     = false
 }
