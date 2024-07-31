@@ -16,11 +16,11 @@ resource "aws_iam_role" "iam_role" {
 resource "aws_iam_policy" "iam_policy" {
   for_each = var.iam_policies
 
-  name        = each.value.name
-  description = each.value.description
-  path        = each.value.path
-  policy      = each.value.policy
-  tags        = merge(var.general_tags, each.value.tags)
+  name        = each.value.name == "value" ? null : each.value.name
+  description = each.value.description == "value" ? null : each.value.description
+  path        = each.value.path == "value" ? null : each.value.path
+  policy      = each.value.policy == "value" ? null : each.value.policy
+  tags        = merge(var.general_tags, each.value.tags == { name : "value" } ? {} : each.value.tags)
 }
 
 # Attachment of policies passed as arn to the lambda
